@@ -1,4 +1,4 @@
-module gopkg.in/yaml.v3
+module yaml_aathan
 
 go 1.19
 
