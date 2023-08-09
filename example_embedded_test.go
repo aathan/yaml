@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"log"
 
-	yaml "yaml"
+	yaml "github.com/aathan/yaml"
 )
 
 // An example showing how to unmarshal embedded

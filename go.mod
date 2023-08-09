@@ -1,4 +1,4 @@
-module yaml
+module github.com/aathan/yaml
 
 go 1.19
 
