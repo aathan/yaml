@@ -26,8 +26,9 @@ import (
 	"net"
 	"os"
 
+	yaml "yaml_aathan"
+
 	. "gopkg.in/check.v1"
-	"gopkg.in/yaml.v3"
 )
 
 var marshalIntTest = 123
