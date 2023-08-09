@@ -22,7 +22,7 @@ import (
 
 	"io"
 	"strings"
-	yaml "yaml_aathan"
+	yaml "yaml"
 
 	. "gopkg.in/check.v1"
 )

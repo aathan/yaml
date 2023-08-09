@@ -1,4 +1,4 @@
-module yaml_aathan
+module yaml
 
 go 1.19
 

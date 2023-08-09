@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	yaml "yaml_aathan"
+	yaml "yaml"
 
 	. "gopkg.in/check.v1"
 )
