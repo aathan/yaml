@@ -35,6 +35,9 @@ import (
 type Unmarshaler interface {
 	UnmarshalYAML(value *Node) error
 }
+type UnmarshalerWithUnmarshal interface {
+	UnmarshalYAMLWithUnmarshal(value *Node, unmarshal func(*Node, any) error) error
+}
 
 type obsoleteUnmarshaler interface {
 	UnmarshalYAML(unmarshal func(interface{}) error) error

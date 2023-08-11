@@ -18,6 +18,7 @@ package yaml
 import (
 	"encoding"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -374,6 +375,18 @@ func (d *decoder) callUnmarshaler(n *Node, u Unmarshaler) (good bool) {
 	return true
 }
 
+func (d *decoder) callUnmarshalerWithUnmarshal(n *Node, u UnmarshalerWithUnmarshal) (good bool) {
+	err := u.UnmarshalYAMLWithUnmarshal(n, d.unmarshaler)
+	if e, ok := err.(*TypeError); ok {
+		d.terrors = append(d.terrors, e.Errors...)
+		return false
+	}
+	if err != nil {
+		fail(err)
+	}
+	return true
+}
+
 func (d *decoder) callObsoleteUnmarshaler(n *Node, u obsoleteUnmarshaler) (good bool) {
 	terrlen := len(d.terrors)
 	err := u.UnmarshalYAML(func(v interface{}) (err error) {
@@ -408,26 +421,39 @@ func (d *decoder) prepare(n *Node, out reflect.Value) (newout reflect.Value, unm
 		return out, false, false
 	}
 	again := true
-	for again {
+	for again { // TODO: Do you *really* want to support indefinite recursion into pointer instantiation? If not, the reflect.Ptr check does not need to be inside the loop
 		again = false
-		if out.Kind() == reflect.Ptr {
+		if out.Kind() == reflect.Ptr { // if we're a pointer, instantiate a new *ptr and unmarshal therein
 			if out.IsNil() {
 				out.Set(reflect.New(out.Type().Elem()))
 			}
 			out = out.Elem()
 			again = true
+			continue
 		}
-		if out.CanAddr() {
-			outi := out.Addr().Interface()
-			if u, ok := outi.(Unmarshaler); ok {
-				good = d.callUnmarshaler(n, u)
-				return out, true, good
-			}
-			if u, ok := outi.(obsoleteUnmarshaler); ok {
-				good = d.callObsoleteUnmarshaler(n, u)
-				return out, true, good
+		var outi any
+		if out.Kind() != reflect.Ptr && out.Kind() != reflect.Interface {
+			if out.CanAddr() {
+				outi = out.Addr().Interface()
+			} else {
+				n := reflect.New(out.Type()).Elem()
+				n.Set(out)
+				outi = n.Addr().Interface()
 			}
 		}
+
+		switch u := outi.(type) {
+		case Unmarshaler:
+			good = d.callUnmarshaler(n, u)
+			return out, true, good
+		case UnmarshalerWithUnmarshal:
+			good = d.callUnmarshalerWithUnmarshal(n, u)
+			return out, true, good
+		case obsoleteUnmarshaler:
+			good = d.callObsoleteUnmarshaler(n, u)
+			return out, true, good
+		}
+
 	}
 	return out, false, false
 }
@@ -479,6 +505,17 @@ func allowedAliasRatio(decodeCount int) float64 {
 		// 400,000 decode operations is ~100MB of allocations in worst-case scenarios (single-item maps).
 		return 0.99 - 0.89*(float64(decodeCount-alias_ratio_range_low)/alias_ratio_range)
 	}
+}
+
+func (d *decoder) unmarshaler(n *Node, out any) error {
+	v := reflect.ValueOf(out)
+	if v.Kind() == reflect.Ptr && !v.IsNil() {
+		v = v.Elem()
+	}
+	if d.unmarshal(n, v) {
+		return nil
+	}
+	return errors.New("unmarshaler failed")
 }
 
 func (d *decoder) unmarshal(n *Node, out reflect.Value) (good bool) {
@@ -876,7 +913,7 @@ func isStringMap(n *Node) bool {
 }
 
 func (d *decoder) mappingStruct(n *Node, out reflect.Value) (good bool) {
-	sinfo, err := getStructInfo(out.Type(), false)
+	sinfo, err := getStructInfo(out.Type(), true)
 	if err != nil {
 		panic(err)
 	}
@@ -921,7 +958,7 @@ func (d *decoder) mappingStruct(n *Node, out reflect.Value) (good bool) {
 		if info, ok := sinfo.FieldsMap[sname]; ok {
 			if d.uniqueKeys {
 				if doneFields[info.Id] {
-					d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s already set in type %s", ni.Line, name.String(), out.Type()))
+					d.terrors = append(d.terrors, fmt.Sprintf("line %d: field %s already set in type %s", ni.Line, sname, out.Type()))
 					continue
 				}
 				doneFields[info.Id] = true
@@ -932,7 +969,11 @@ func (d *decoder) mappingStruct(n *Node, out reflect.Value) (good bool) {
 			} else {
 				field = d.fieldByIndex(n, out, info.Inline)
 			}
+			fmt.Println("unmarshal field", sname, n.Content[i+1])
 			d.unmarshal(n.Content[i+1], field)
+			if field.CanAddr() {
+				fmt.Println("unmarshal field value", info.Id, field.Interface())
+			}
 		} else if sinfo.InlineMap != -1 {
 			if inlineMap.IsNil() {
 				inlineMap.Set(reflect.MakeMap(inlineMap.Type()))
