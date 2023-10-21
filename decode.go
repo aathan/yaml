@@ -969,11 +969,11 @@ func (d *decoder) mappingStruct(n *Node, out reflect.Value) (good bool) {
 			} else {
 				field = d.fieldByIndex(n, out, info.Inline)
 			}
-			fmt.Println("unmarshal field", sname, n.Content[i+1])
+			//fmt.Println("unmarshal field", sname, n.Content[i+1])
 			d.unmarshal(n.Content[i+1], field)
-			if field.CanAddr() {
-				fmt.Println("unmarshal field value", info.Id, field.Interface())
-			}
+			//if field.CanAddr() {
+			//	fmt.Println("unmarshal field value", info.Id, field.Interface())
+			//}
 		} else if sinfo.InlineMap != -1 {
 			if inlineMap.IsNil() {
 				inlineMap.Set(reflect.MakeMap(inlineMap.Type()))
